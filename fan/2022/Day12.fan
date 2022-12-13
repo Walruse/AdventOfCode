@@ -45,8 +45,6 @@ class Day12 {
 		curNode		:= startNode
 		doBreak 	:= false
 		
-		step := 0
-		
 		while (!doBreak) {
 			neighbours := nodeGrid.getNeighbours(curNode)
 			neighbours.each {
@@ -57,8 +55,6 @@ class Day12 {
 			curNode.isVisited = true
 			if (curNode.height == 'a')	
 				doBreak = true
-			
-			step++
 			
 			if (!doBreak)
 				curNode = nodeGrid.getSmallestNode
@@ -218,8 +214,6 @@ class Node {
 		this.posX 		= posX
 		this.posY 		= posY
 		this.height 	= height
-//		if (this.height == 'a' && this.posX > 0)
-//			this.height = 100
 		if (isStart) {
 			this.tentDis 	= 0
 			this.isStart  	= true

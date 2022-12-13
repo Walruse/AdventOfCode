@@ -14,113 +14,241 @@ class Day12 {
 	}
 	
 	private Obj? part1() {
-		startY := input.findIndex { it.dup.readAllStr.contains("S") }
-		startX := input[startY].dup.readAllStr.index("S")
+		nodeGrid 	:= NodeGrid.make(input, 'S', 'E')
+		startNode 	:= nodeGrid.getStartNode
+		endNode 	:= nodeGrid.getEndNode
 		
-		curHeight 	:= "a".chars.first
-		curX		:= startX
-		curY		:= startY
+		curNode		:= startNode
 		
-		finishY := input.findIndex { it.dup.readAllStr.contains("E") }
-		finishX := input[startY].dup.readAllStr.index("E")
-		
-		echo([curX,curY])
-		echo([finishX,finishY])
-		
-		nodesToConsider := Int[][,]
-		nodesUsed := [[curX,curY]]
-		solutionNodes := [[curX,curY]]
-		steps := 0
-		
-		a := 0
-		
-		echo("==============")
-		while (curX != finishX || curY != finishY) {
-			echo("cur: " + [curX,curY,steps])
-			echo("nodes used: " + nodesUsed)
-			echo("nodes to consider: " + nodesToConsider)
-			// check adjacent nodes
-			// if no nodes viable
-			//  - update curPos to most recently valid node
-			// add viable nodes to nodesToConsider (prioritise increase in height)
-			// set curPos to top valid node
-			adjNodes := [
-				[curX - 1, curY, curX, curY],
-				[curX + 1, curY, curX, curY],
-				[curX, curY - 1, curX, curY],
-				[curX, curY + 1, curX, curY]
-			].findAll |coords| { 
-				if (coords[0] < 0 || coords[1] < 0)
-					return false
-				
-				if (coords[0] >= input[0].size || coords[1] >= input.size)
-					return false
-				
-				if (nodesUsed.contains([coords[0],coords[1]]))
-					return false
-				
-				if (nodesToConsider.find |conCoords| { conCoords[0] == coords[0] && conCoords[1] == coords[1] } != null)
-					return false
-				
-				height := getHeight(coords)
-				if (height > curHeight + 1)
-					return false
-				
-				return true
+		while (!endNode.isVisited && !nodeGrid.allVisited) {
+			neighbours := nodeGrid.getNeighbours(curNode)
+			neighbours.each { 
+				distFromCur := curNode.tentDis + 1
+				if (it.tentDis > distFromCur)
+					it.tentDis = distFromCur
 			}
-			adjNodes.sortr |co1, co2| { finishY - co1[1] <=> finishY - co2[1] }
-			adjNodes.sortr |co1, co2| { finishX - co1[0] <=> finishX - co2[0] }
-			adjNodes.sort |co1, co2| { getHeight(co1) <=> getHeight(co2) }
-			echo("new nodes to consider: " + adjNodes)
-			nodesToConsider.addAll(adjNodes)
-			if (adjNodes.isEmpty) {
-				returnCoords := [nodesToConsider.last[2],nodesToConsider.last[3]]
-				echo("return coords: " + returnCoords)
-				rangeToRemove := (solutionNodes.findIndex { it[0] == returnCoords[0] && it[1] == returnCoords[1] } + 1)..(solutionNodes.size - 1)
-//				nodesUsed.removeRange(rangeToRemove)
-				solutionNodes.removeRange(rangeToRemove)
-				steps = steps - ((rangeToRemove.end - rangeToRemove.start) + 1)
-			}
-				
-			newPos := nodesToConsider.removeAt(-1)
-			curX = newPos[0]
-			curY = newPos[1]
-			curHeight = getHeight(newPos)
-			solutionNodes.add([curX,curY])
-			nodesUsed.add([curX,curY])
-			steps++
-			a++
-//			if (a > 40)
-//				throw Err("errs")
-			echo("------------")
+			curNode.isVisited = true
+			if (!nodeGrid.allVisited && !endNode.isVisited)
+				curNode = nodeGrid.getSmallestNode
+			
 		}
 		
-		patt := "MM-DD-hh-mm-ss"
-		file := `outputs/2022/`.plusName("day12-${DateTime.now.toLocale(patt)}-path.txt").toFile
-		newGrid :=(Buf[]) `inputs/2022/day12.txt`.toFile.readAllLines.map { it.toBuf }
-		solutionNodes.each |Int[] coords| { newGrid[coords[1]][coords[0]] = "X".chars.first }
-		file.delete
-		output := file.create.open
-		newGrid.each |Buf buf| { output.writeChars(buf.readAllStr).writeChars("\n") }
-		output.close
+		nodeGrid.writeShortestPathToFile
 		
-		file2 := `outputs/2022/`.plusName("day12-${DateTime.now.toLocale(patt)}-used.txt").toFile
-		newGrid2 :=(Buf[]) `inputs/2022/day12.txt`.toFile.readAllLines.map { it.toBuf }
-		nodesUsed.each |Int[] coords| { newGrid2[coords[1]][coords[0]] = "X".chars.first }
-		file2.delete
-		output2 := file2.create.open
-		newGrid2.each |Buf buf| { output2.writeChars(buf.readAllStr).writeChars("\n") }
-		output2.close
-		
-		return [curX,curY]
-	}
-	
-	private Int getHeight(Int[] coords) {
-		input[coords[1]][coords[0]]
+		return endNode.tentDis
 	}
 	
 	private Obj? part2() {
-		throw UnsupportedErr("write this!")
+		nodeGrid 	:= NodeGrid.makeInverse(`inputs/2022/day12.txt`.toFile.readAllLines.map { it.toBuf }, 'E', 'S')
+		startNode 	:= nodeGrid.getStartNode
+		
+		curNode		:= startNode
+		doBreak 	:= false
+		
+		step := 0
+		
+		while (!doBreak) {
+			neighbours := nodeGrid.getNeighbours(curNode)
+			neighbours.each {
+				distFromCur := curNode.tentDis + 1
+				if (it.tentDis > distFromCur)
+					it.tentDis = distFromCur
+			}
+			curNode.isVisited = true
+			if (curNode.height == 'a')	
+				doBreak = true
+			
+			step++
+			
+			if (!doBreak)
+				curNode = nodeGrid.getSmallestNode
+		}
+		
+		nodeGrid.writeShortestPathToFile(2)
+		
+		return nodeGrid.getEndNode.tentDis
+	}
+	
+	
+}
+
+class NodeGrid {
+	
+	Node[] 	nodes
+	Bool 	isInverse := false
+	
+	new make(Buf[] input, Int startChar, Int endChar) {
+		this.nodes = Node[,]
+		input.each |row, idx| {
+			for (i := 0; i < row.size; i++) {
+				char := row[i]
+				isStart := char == startChar
+				isEnd 	:= char == endChar
+				if (isStart)
+					char = 'a'
+				if (isEnd)
+					char = 'z'
+				nodes.add(Node(i, idx, char, isStart, isEnd))
+			}
+		}
+	}
+	
+	new makeInverse(Buf[] input, Int startChar, Int endChar) {
+		this.nodes = Node[,]
+		input.each |row, idx| {
+			for (i := 0; i < row.size; i++) {
+				char := row[i]
+				isStart := char == startChar
+				isEnd 	:= char == endChar
+				if (isStart)
+					char = 'z'
+				if (isEnd)
+					char = 'a'
+				nodes.add(Node(i, idx, char, isStart))
+			}
+		}
+		this.isInverse = true
+	}
+	
+	Node[] getShortestPath() {
+		curNode 	:= getEndNode
+		nodes		:= [curNode]
+		while (curNode.tentDis != 0) {
+			neighbours 	:= getNeighbours(curNode, true)
+			prevNode 	:= neighbours.find |node| { node.tentDis == (curNode.tentDis - 1) }
+			nodes.insert(0, prevNode)
+			curNode = prevNode
+		}
+		return nodes
+	}
+	
+	Node getSmallestNode() {
+		nodes.findAll { !it.isVisited }.sort |n1, n2| { n1.tentDis <=> n2.tentDis }.first
+	}
+	
+	Node getStartNode() {
+		nodes.find { it.isStart }
+	}
+	
+	Node getEndNode() {
+		this.isInverse ? nodes.find { it.height == 'a' && it.isVisited } : nodes.find { it.isEnd }
+	}
+	
+	@Operator
+	Node get(Int[] coords) {
+		nodes.find { it.posX == coords[0] && it.posY == coords[1] }
+	}
+	
+	Node[] getNeighbours(Node baseNode, Bool ignoreHeight := false) {
+		nodes.findAll |node| { 
+			isX := (node.posX - baseNode.posX).abs <= 1 && node.posY == baseNode.posY
+			isY := (node.posY - baseNode.posY).abs <= 1 && node.posX == baseNode.posX
+			if (node.posX == baseNode.posX && node.posY == baseNode.posY)
+				return false
+			
+			if (!isX && !isY)
+				return false
+			
+			if (isInverse) {
+				if (baseNode.height - node.height > 1 && !ignoreHeight)
+					return false
+			} else {
+				if (node.height - baseNode.height > 1 && !ignoreHeight)
+					return false
+			}
+			
+			if (ignoreHeight && node.height == 'a' && node.posX != 0)
+				return false
+			
+			return true
+		}
+	}
+	
+	Bool allVisited() {
+		nodes.find { !it.isVisited } == null
+	}
+	
+	Void writeShortestPathToFile(Int partNum := 1) {
+		dir			:= `outputs/2022/day12/`.toFile
+		numOutputs 	:= dir.listFiles.size
+		file 		:= dir.uri.plusName("day12_${partNum}-path-${numOutputs}.txt").toFile
+		initLines 	:=(Buf[]) `inputs/2022/day12.txt`.toFile.readAllLines.map { it.toBuf }
+		file.delete
+		fileBuf := file.create.open
+		getShortestPath.each |node| { 
+			initLines[node.posY][node.posX] = '#'
+		}
+		initLines.each {
+			fileBuf.writeChars(it.readAllStr).writeChars("\n")
+		}
+		fileBuf.close
+	}
+	
+	Void writeToFile() {
+		dir			:= `outputs/2022/day12/`.toFile
+		numOutputs 	:= dir.listFiles.size
+		file 		:= dir.uri.plusName("day12-${numOutputs}.txt").toFile
+		initLines 	:=(Buf[]) `inputs/2022/day12.txt`.toFile.readAllLines.map { it.toBuf }
+		file.delete
+		fileBuf := file.create.open
+		nodes.each {
+			str := it.tentDis == 99999999999 ? it.height.toChar.padl(3) : it.tentDis.toLocale("##0").padl(3)
+			fileBuf.writeChars("|${str}")
+			if (it.posX == 171)
+				fileBuf.writeChars("\n")
+			
+		}
+		fileBuf.close
+		echo("Written output to: ${file}")
+	}
+	
+}
+
+class Node {
+	
+	Int posX
+	Int posY
+	Int height
+	Int tentDis 	:= 99999999999
+	Bool isVisited 	:= false
+	Bool isStart	:= false
+	Bool isEnd		:= false
+	
+	new make(Int posX, Int posY, Int height, Bool isStart, Bool isEnd) {
+		this.posX 		= posX
+		this.posY 		= posY
+		this.height 	= height
+//		if (this.height == 'a' && this.posX > 0)
+//			this.height = 100
+		if (isStart) {
+			this.tentDis 	= 0
+			this.isStart  	= true
+		}
+		if (isEnd)
+			this.isEnd		= true
+	}
+	
+	new makeInverse(Int posX, Int posY, Int height, Bool isStart) {
+		this.posX 		= posX
+		this.posY 		= posY
+		this.height 	= height
+		if (isStart) {
+			this.tentDis 	= 0
+			this.isStart  	= true
+		}
+	}
+	
+	override Str toStr() {
+		str := "Node ("
+		str += posX.toLocale("##0").padl(3) + "-"
+		str += posY.toLocale("##0").padl(3) + "): "
+		str += "[" + height.toChar + "] "
+		str += "[" + tentDis + "] "
+		if (this.isStart)
+			str += "[isStart] "
+		if (this.isEnd)
+			str += "[isEnd] "
+		return str
 	}
 	
 }
